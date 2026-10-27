@@ -60,7 +60,9 @@ def read_exif_datetime(path: Path) -> str | None:
 
         with Image.open(path) as img:
             exif = img.getexif()
-            # 36867 = DateTimeOriginal, 306 = DateTime
-            return exif.get(36867) or exif.get(306)
+            # DateTimeOriginal (36867) / DateTimeDigitized (36868) live in the Exif
+            # sub-IFD (pointer 0x8769); DateTime (306) in IFD0 is only the last edit.
+            sub = exif.get_ifd(0x8769)
+            return sub.get(36867) or sub.get(36868) or exif.get(306)
     except Exception:
         return None

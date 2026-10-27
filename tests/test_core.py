@@ -37,3 +37,18 @@ def test_file_sha256(tmp_path):
     f.write_bytes(b"hello world")
     # sha256("hello world")
     assert file_sha256(f) == "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+
+
+def test_read_exif_prefers_capture_date_over_edit_date(tmp_path):
+    import pytest
+
+    Image = pytest.importorskip("PIL.Image")
+    from snapsort.core import read_exif_datetime
+
+    img = Image.new("RGB", (4, 4))
+    exif = Image.Exif()
+    exif[306] = "2024:01:01 00:00:00"
+    exif.get_ifd(0x8769)[36867] = "2019:03:10 10:00:00"
+    path = tmp_path / "p.jpg"
+    img.save(path, exif=exif)
+    assert read_exif_datetime(path) == "2019:03:10 10:00:00"

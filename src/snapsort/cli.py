@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 
@@ -28,21 +29,28 @@ def organize(
 ) -> None:
     """Sort every file under SRC into DST/YYYY/MM based on capture date."""
     seen_hashes: set[str] = set()
+    planned_targets: set[str] = set()
     planned = 0
     skipped = 0
     duplicates = 0
 
     for path in sorted(p for p in src.rglob("*") if p.is_file()):
-        digest = file_sha256(path)
-        if dedupe and digest in seen_hashes:
-            duplicates += 1
-            continue
-        seen_hashes.add(digest)
+        if dedupe:
+            digest = file_sha256(path)
+            if digest in seen_hashes:
+                duplicates += 1
+                continue
+            seen_hashes.add(digest)
 
         when = resolve_date(read_exif_datetime(path), path.stat().st_mtime)
         target_dir = dst / bucket_for(when)
-        name = unique_target(path.name, lambda n, d=target_dir: (d / n).exists())
+        # Also avoid names already planned in this run, so --dry-run matches a real run.
+        name = unique_target(
+            path.name,
+            lambda n, d=target_dir: (d / n).exists() or os.path.normcase(d / n) in planned_targets,
+        )
         target = target_dir / name
+        planned_targets.add(os.path.normcase(target))
 
         verb = "MOVE" if move else "COPY"
         typer.echo(f"{verb} {path}  ->  {target}")
